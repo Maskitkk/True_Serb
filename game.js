@@ -1,0 +1,276 @@
+import * as THREE from 'three';
+
+// Основные переменные
+let camera, scene, renderer;
+let player;
+let collectibles = [];
+let score = 0;
+let mousePosition = new THREE.Vector3();
+
+// Аудио
+const backgroundMusic = new Audio('assets/background.mp3');
+backgroundMusic.loop = true;
+backgroundMusic.volume = 0.3;
+backgroundMusic.play(); // Автоматически запускаем музыку
+
+const collectSound = new Audio('assets/collect.mp3');
+collectSound.volume = 0.5;
+
+// Загрузчик текстур
+const textureLoader = new THREE.TextureLoader();
+
+// Загрузка шейдеров
+const vertexShader = `
+varying vec2 vUv;
+
+void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const fragmentShader = `
+uniform sampler2D tDiffuse;
+uniform float blurAmount;
+varying vec2 vUv;
+
+void main() {
+    vec4 color = vec4(0.0);
+    float total = 0.0;
+    
+    // Размер шага для размытия
+    vec2 texelSize = vec2(1.0 / 500.0);
+    float radius = 2.0 * blurAmount;
+    
+    // Гауссово размытие
+    for(float x = -radius; x <= radius; x += 1.0) {
+        for(float y = -radius; y <= radius; y += 1.0) {
+            vec2 offset = vec2(x, y) * texelSize;
+            float weight = exp(-(x*x + y*y) / (2.0 * radius * radius));
+            color += texture2D(tDiffuse, vUv + offset) * weight;
+            total += weight;
+        }
+    }
+    
+    gl_FragColor = color / total;
+}`;
+
+// Предзагрузка текстур
+const backgroundTexture = textureLoader.load('assets/fon.jpg');
+const playerDefaultTexture = textureLoader.load('assets/vanya.png');
+const beerTexture = textureLoader.load('assets/пиво1.png');
+
+// Создание счетчика очков
+const scoreElement = document.createElement('div');
+scoreElement.style.position = 'absolute';
+scoreElement.style.top = '20px';
+scoreElement.style.left = '20px';
+scoreElement.style.color = 'white';
+scoreElement.style.fontSize = '24px';
+scoreElement.style.fontFamily = 'Arial';
+scoreElement.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+document.body.appendChild(scoreElement);
+updateScore(0);
+
+// Скрываем системный курсор
+document.body.style.cursor = 'none';
+
+// Функция обновления счета
+function updateScore(newScore) {
+    score = newScore;
+    scoreElement.textContent = `Счёт: ${score}`;
+}
+
+// Создание коллекционного предмета (пиво)
+function createCollectible() {
+    // Удаляем все существующие предметы
+    for (let collectible of collectibles) {
+        scene.remove(collectible);
+    }
+    collectibles = [];
+
+    const geometry = new THREE.PlaneGeometry(30, 30);
+    const material = new THREE.MeshBasicMaterial({
+        map: beerTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const collectible = new THREE.Mesh(geometry, material);
+
+    // Случайная позиция на поле
+    collectible.position.x = (Math.random() - 0.5) * 400;
+    collectible.position.z = (Math.random() - 0.5) * 400;
+    collectible.position.y = 2;
+    collectible.rotation.x = -Math.PI / 2;
+
+    scene.add(collectible);
+    collectibles.push(collectible);
+    return collectible;
+}
+
+// Проверка столкновений
+function checkCollisions() {
+    const playerRadius = 20;
+    const collectibleRadius = 15;
+
+    for (let i = collectibles.length - 1; i >= 0; i--) {
+        const collectible = collectibles[i];
+        const dx = player.position.x - collectible.position.x;
+        const dz = player.position.z - collectible.position.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+
+        if (distance < playerRadius + collectibleRadius) {
+            scene.remove(collectible);
+            collectibles.splice(i, 1);
+            updateScore(score + 1);
+            collectSound.currentTime = 0;
+            collectSound.play();
+            createCollectible();
+        }
+    }
+}
+
+// Преобразование координат мыши в мировые координаты
+function getMouseWorldPosition(event) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const targetPoint = new THREE.Vector3();
+
+    if (raycaster.ray.intersectPlane(plane, targetPoint)) {
+        return targetPoint;
+    }
+    return null;
+}
+
+// Создание фона
+function createBackground() {
+    // Создаем группу для фона
+    const backgroundGroup = new THREE.Group();
+
+    // Основное фоновое изображение с размытием
+    const geometry = new THREE.PlaneGeometry(500, 500);
+    const material = new THREE.ShaderMaterial({
+        uniforms: {
+            tDiffuse: { value: backgroundTexture },
+            blurAmount: { value: 1.0 } // Степень размытия
+        },
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    const background = new THREE.Mesh(geometry, material);
+    background.rotation.x = -Math.PI / 2;
+    background.position.y = 0;
+
+    // Затемняющий слой
+    const darkOverlayGeometry = new THREE.PlaneGeometry(500, 500);
+    const darkOverlayMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.4, // Увеличили затемнение
+        side: THREE.DoubleSide
+    });
+    const darkOverlay = new THREE.Mesh(darkOverlayGeometry, darkOverlayMaterial);
+    darkOverlay.rotation.x = -Math.PI / 2;
+    darkOverlay.position.y = 0.1;
+
+    backgroundGroup.add(background);
+    backgroundGroup.add(darkOverlay);
+    return backgroundGroup;
+}
+
+// Создание игрока
+function createPlayer() {
+    const geometry = new THREE.PlaneGeometry(40, 40);
+    const material = new THREE.MeshBasicMaterial({
+        map: playerDefaultTexture,
+        transparent: true,
+        side: THREE.DoubleSide
+    });
+    const playerMesh = new THREE.Mesh(geometry, material);
+    playerMesh.rotation.x = -Math.PI / 2;
+    playerMesh.position.y = 2;
+    return playerMesh;
+}
+
+// Инициализация сцены
+function init() {
+    scene = new THREE.Scene();
+
+    // Настройка камеры
+    camera = new THREE.OrthographicCamera(
+        -250, 250,
+        250, -250,
+        1, 1000
+    );
+    camera.position.set(0, 100, 0);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+    // Создаем рендерер
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Добавляем фон
+    scene.add(createBackground());
+
+    // Создаем игрока
+    player = createPlayer();
+    scene.add(player);
+
+    // Создаем первое пиво
+    createCollectible();
+
+    // Обработчики событий
+    document.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('resize', onWindowResize);
+}
+
+// Обработка движения мыши
+function onMouseMove(event) {
+    const worldPosition = getMouseWorldPosition(event);
+    if (worldPosition) {
+        mousePosition.copy(worldPosition);
+    }
+}
+
+// Обработка изменения размера окна
+function onWindowResize() {
+    const aspect = window.innerWidth / window.innerHeight;
+    const frustumSize = 250;
+
+    camera.left = -frustumSize * aspect;
+    camera.right = frustumSize * aspect;
+    camera.top = frustumSize;
+    camera.bottom = -frustumSize;
+
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Обновление позиции игрока
+function updatePlayer() {
+    if (!player || !mousePosition) return;
+
+    // Плавное движение к позиции мыши
+    player.position.x += (mousePosition.x - player.position.x) * 0.1;
+    player.position.z += (mousePosition.z - player.position.z) * 0.1;
+}
+
+// Анимация
+function animate() {
+    requestAnimationFrame(animate);
+    updatePlayer();
+    checkCollisions();
+    renderer.render(scene, camera);
+}
+
+// Запуск игры
+init();
+animate(); 
