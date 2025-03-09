@@ -282,7 +282,7 @@ function createCollectible() {
     }
     collectibles = [];
 
-    const geometry = new THREE.PlaneGeometry(30, 30);
+    const geometry = new THREE.PlaneGeometry(40, 40); // Увеличиваем размер для лучшей видимости
     const material = new THREE.MeshBasicMaterial({
         map: beerTexture,
         transparent: true,
@@ -354,15 +354,14 @@ function getMouseWorldPosition(event) {
 
 // Создание фона
 function createBackground() {
-    // Создаем группу для фона
     const backgroundGroup = new THREE.Group();
 
-    // Основное фоновое изображение с размытием
-    const geometry = new THREE.PlaneGeometry(500, 500);
+    // Основное фоновое изображение
+    const geometry = new THREE.PlaneGeometry(800, 800); // Увеличиваем размер фона
     const material = new THREE.ShaderMaterial({
         uniforms: {
             tDiffuse: { value: backgroundTexture },
-            blurAmount: { value: 1.0 } // Степень размытия
+            blurAmount: { value: 1.0 }
         },
         vertexShader: vertexShader,
         fragmentShader: fragmentShader,
@@ -374,11 +373,11 @@ function createBackground() {
     background.position.y = 0;
 
     // Затемняющий слой
-    const darkOverlayGeometry = new THREE.PlaneGeometry(500, 500);
+    const darkOverlayGeometry = new THREE.PlaneGeometry(800, 800);
     const darkOverlayMaterial = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
-        opacity: 0.4, // Увеличили затемнение
+        opacity: 0.4,
         side: THREE.DoubleSide
     });
     const darkOverlay = new THREE.Mesh(darkOverlayGeometry, darkOverlayMaterial);
@@ -392,7 +391,7 @@ function createBackground() {
 
 // Создание игрока
 function createPlayer() {
-    const geometry = new THREE.PlaneGeometry(40, 40);
+    const geometry = new THREE.PlaneGeometry(50, 50); // Увеличиваем размер игрока
     const material = new THREE.MeshBasicMaterial({
         map: playerDefaultTexture,
         transparent: true,
@@ -422,7 +421,7 @@ function init() {
     scene = new THREE.Scene();
 
     // Настройка камеры с учетом мобильных устройств
-    const frustumSize = isMobile ? 350 : 250; // Увеличиваем размер для мобильных
+    const frustumSize = isMobile ? 400 : 300; // Корректируем размер для лучшего масштаба
     const aspect = window.innerWidth / window.innerHeight;
 
     camera = new THREE.OrthographicCamera(
@@ -455,6 +454,10 @@ function init() {
     if (isMobile) {
         document.addEventListener('touchmove', onMouseMove, { passive: false });
         document.addEventListener('touchstart', onMouseMove, { passive: false });
+        // Добавляем обработчик для всего документа
+        document.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
     } else {
         document.addEventListener('mousemove', onMouseMove);
     }
@@ -466,11 +469,15 @@ document.body.style.overflow = 'hidden';
 document.body.style.position = 'fixed';
 document.body.style.touchAction = 'none';
 
-// Обновляем функцию onMouseMove для предотвращения стандартного поведения на мобильных
+// Обновляем функцию onMouseMove для лучшей обработки тач-событий
 function onMouseMove(event) {
     if (event.cancelable) {
         event.preventDefault();
     }
+
+    // Проверяем, запущена ли игра
+    if (!gameStarted) return;
+
     const worldPosition = getMouseWorldPosition(event);
     if (worldPosition) {
         mousePosition.copy(worldPosition);
@@ -480,7 +487,7 @@ function onMouseMove(event) {
 // Обработка изменения размера окна
 function onWindowResize() {
     const aspect = window.innerWidth / window.innerHeight;
-    const frustumSize = 250;
+    const frustumSize = isMobile ? 400 : 300; // Используем те же значения, что и в init
 
     camera.left = -frustumSize * aspect;
     camera.right = frustumSize * aspect;
