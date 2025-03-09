@@ -9,6 +9,9 @@ let mousePosition = new THREE.Vector3();
 let gameStarted = false;
 let resourcesLoaded = false;
 
+// Добавляем определение мобильного устройства после основных переменных
+let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 // Создание загрузочного экрана
 const loadingOverlay = document.createElement('div');
 loadingOverlay.style.position = 'fixed';
@@ -205,6 +208,20 @@ function updateScore(newScore) {
     scoreElement.textContent = `Счёт: ${score}`;
 }
 
+// Добавляем мета-тег для правильного масштабирования на мобильных устройствах
+const viewport = document.createElement('meta');
+viewport.name = 'viewport';
+viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+document.head.appendChild(viewport);
+
+// Изменяем размеры и стили для мобильных устройств
+if (isMobile) {
+    gameTitle.style.fontSize = '36px';
+    startText.style.fontSize = '20px';
+    loadingText.style.fontSize = '20px';
+    scoreElement.style.fontSize = '20px';
+}
+
 // Создание коллекционного предмета (пиво)
 function createCollectible() {
     // Удаляем все существующие предметы
@@ -221,9 +238,10 @@ function createCollectible() {
     });
     const collectible = new THREE.Mesh(geometry, material);
 
-    // Случайная позиция на поле
-    collectible.position.x = (Math.random() - 0.5) * 400;
-    collectible.position.z = (Math.random() - 0.5) * 400;
+    // Адаптивное размещение в зависимости от устройства
+    const playAreaSize = isMobile ? 600 : 400;
+    collectible.position.x = (Math.random() - 0.5) * playAreaSize;
+    collectible.position.z = (Math.random() - 0.5) * playAreaSize;
     collectible.position.y = 2;
     collectible.rotation.x = -Math.PI / 2;
 
@@ -254,11 +272,21 @@ function checkCollisions() {
     }
 }
 
-// Преобразование координат мыши в мировые координаты
+// Модифицируем функцию getMouseWorldPosition для поддержки тач-событий
 function getMouseWorldPosition(event) {
+    let clientX, clientY;
+
+    if (event.touches) { // Для тач-событий
+        clientX = event.touches[0].clientX;
+        clientY = event.touches[0].clientY;
+    } else { // Для мыши
+        clientX = event.clientX;
+        clientY = event.clientY;
+    }
+
     const rect = renderer.domElement.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
@@ -337,15 +365,21 @@ function startGame() {
 // Обработчик клика для запуска игры
 startOverlay.addEventListener('click', startGame);
 
-// Инициализация сцены
+// Модифицируем функцию init для добавления обработчиков тач-событий
 function init() {
     scene = new THREE.Scene();
 
-    // Настройка камеры
+    // Настройка камеры с учетом мобильных устройств
+    const frustumSize = isMobile ? 350 : 250; // Увеличиваем размер для мобильных
+    const aspect = window.innerWidth / window.innerHeight;
+
     camera = new THREE.OrthographicCamera(
-        -250, 250,
-        250, -250,
-        1, 1000
+        -frustumSize * aspect,
+        frustumSize * aspect,
+        frustumSize,
+        -frustumSize,
+        1,
+        1000
     );
     camera.position.set(0, 100, 0);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -365,13 +399,26 @@ function init() {
     // Создаем первое пиво
     createCollectible();
 
-    // Обработчики событий
-    document.addEventListener('mousemove', onMouseMove);
+    // Обработчики событий с поддержкой тач-событий
+    if (isMobile) {
+        document.addEventListener('touchmove', onMouseMove, { passive: false });
+        document.addEventListener('touchstart', onMouseMove, { passive: false });
+    } else {
+        document.addEventListener('mousemove', onMouseMove);
+    }
     window.addEventListener('resize', onWindowResize);
 }
 
-// Обработка движения мыши
+// Предотвращаем скролл на мобильных устройствах
+document.body.style.overflow = 'hidden';
+document.body.style.position = 'fixed';
+document.body.style.touchAction = 'none';
+
+// Обновляем функцию onMouseMove для предотвращения стандартного поведения на мобильных
 function onMouseMove(event) {
+    if (event.cancelable) {
+        event.preventDefault();
+    }
     const worldPosition = getMouseWorldPosition(event);
     if (worldPosition) {
         mousePosition.copy(worldPosition);
