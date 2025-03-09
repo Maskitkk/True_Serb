@@ -11,10 +11,35 @@ let mousePosition = new THREE.Vector3();
 const backgroundMusic = new Audio('assets/background.mp3');
 backgroundMusic.loop = true;
 backgroundMusic.volume = 0.3;
-backgroundMusic.play(); // Автоматически запускаем музыку
 
 const collectSound = new Audio('assets/collect.mp3');
 collectSound.volume = 0.5;
+
+// Добавляем оверлей для запуска музыки
+const startOverlay = document.createElement('div');
+startOverlay.style.position = 'fixed';
+startOverlay.style.top = '0';
+startOverlay.style.left = '0';
+startOverlay.style.width = '100%';
+startOverlay.style.height = '100%';
+startOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+startOverlay.style.display = 'flex';
+startOverlay.style.justifyContent = 'center';
+startOverlay.style.alignItems = 'center';
+startOverlay.style.zIndex = '1000';
+startOverlay.style.cursor = 'pointer';
+
+const startText = document.createElement('div');
+startText.textContent = 'Нажмите чтобы начать игру';
+startText.style.color = 'white';
+startText.style.fontSize = '24px';
+startText.style.fontFamily = 'Arial';
+startText.style.padding = '20px';
+startText.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+startText.style.borderRadius = '10px';
+
+startOverlay.appendChild(startText);
+document.body.appendChild(startOverlay);
 
 // Загрузчик текстур
 const textureLoader = new THREE.TextureLoader();
@@ -198,6 +223,16 @@ function createPlayer() {
     playerMesh.position.y = 2;
     return playerMesh;
 }
+
+// Функция для начала игры
+function startGame() {
+    startOverlay.style.display = 'none';
+    backgroundMusic.play();
+    document.body.style.cursor = 'none';
+}
+
+// Обработчик клика для запуска игры
+startOverlay.addEventListener('click', startGame);
 
 // Инициализация сцены
 function init() {
