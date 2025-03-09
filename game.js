@@ -282,7 +282,7 @@ function createCollectible() {
     }
     collectibles = [];
 
-    const geometry = new THREE.PlaneGeometry(30, 30); // Уменьшаем размер для правильных пропорций
+    const geometry = new THREE.PlaneGeometry(45, 45); // Увеличиваем размер пива
     const material = new THREE.MeshBasicMaterial({
         map: beerTexture,
         transparent: true,
@@ -293,8 +293,8 @@ function createCollectible() {
     // Ограничиваем область появления предметов
     const frustumSize = isMobile ? 400 : 300;
     const aspect = window.innerWidth / window.innerHeight;
-    const maxX = (frustumSize * aspect) * 0.8; // 80% от видимой области
-    const maxZ = frustumSize * 0.8;
+    const maxX = (frustumSize * aspect) * 0.7; // Уменьшаем до 70% от видимой области
+    const maxZ = frustumSize * 0.7;
 
     collectible.position.x = (Math.random() - 0.5) * maxX * 2;
     collectible.position.z = (Math.random() - 0.5) * maxZ * 2;
@@ -308,8 +308,8 @@ function createCollectible() {
 
 // Проверка столкновений
 function checkCollisions() {
-    const playerRadius = 20;
-    const collectibleRadius = 15;
+    const playerRadius = 25; // Увеличиваем радиус коллизии игрока
+    const collectibleRadius = 20; // Увеличиваем радиус коллизии пива
 
     for (let i = collectibles.length - 1; i >= 0; i--) {
         const collectible = collectibles[i];
@@ -401,7 +401,7 @@ function createBackground() {
 
 // Создание игрока
 function createPlayer() {
-    const geometry = new THREE.PlaneGeometry(35, 35); // Корректируем размер игрока
+    const geometry = new THREE.PlaneGeometry(50, 50); // Увеличиваем размер игрока
     const material = new THREE.MeshBasicMaterial({
         map: playerDefaultTexture,
         transparent: true,
@@ -425,13 +425,19 @@ function startGame() {
 
 // Обработчик клика для запуска игры
 startOverlay.addEventListener('click', startGame);
+if (isMobile) {
+    startOverlay.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        startGame();
+    }, { passive: false });
+}
 
 // Модифицируем функцию init для добавления обработчиков тач-событий
 function init() {
     scene = new THREE.Scene();
 
     // Настройка камеры с учетом мобильных устройств
-    const frustumSize = isMobile ? 400 : 300; // Корректируем размер для лучшего масштаба
+    const frustumSize = isMobile ? 400 : 300;
     const aspect = window.innerWidth / window.innerHeight;
 
     camera = new THREE.OrthographicCamera(
@@ -462,14 +468,10 @@ function init() {
 
     // Обработчики событий с поддержкой тач-событий
     if (isMobile) {
-        document.addEventListener('touchmove', onMouseMove, { passive: false });
-        document.addEventListener('touchstart', onMouseMove, { passive: false });
-        // Добавляем обработчик для всего документа
-        document.addEventListener('touchstart', (e) => {
-            if (e.cancelable) e.preventDefault();
-        }, { passive: false });
+        renderer.domElement.addEventListener('touchmove', onMouseMove, { passive: false });
+        renderer.domElement.addEventListener('touchstart', onMouseMove, { passive: false });
     } else {
-        document.addEventListener('mousemove', onMouseMove);
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
     }
     window.addEventListener('resize', onWindowResize);
 }
