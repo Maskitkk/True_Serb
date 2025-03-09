@@ -97,92 +97,33 @@ startOverlay.appendChild(gameTitle);
 startOverlay.appendChild(startText);
 document.body.appendChild(startOverlay);
 
-// Аудио
-const backgroundMusic = new Audio('assets/background.mp3');
-backgroundMusic.loop = true;
-backgroundMusic.volume = 0.3;
-
-const collectSound = new Audio('assets/collect.mp3');
-collectSound.volume = 0.5;
+// Объявляем переменные для ресурсов
+let backgroundMusic, collectSound;
+let backgroundTexture, playerDefaultTexture, beerTexture;
 
 // Загрузчик текстур
 const textureLoader = new THREE.TextureLoader();
 const loadManager = new THREE.LoadingManager();
-let totalResources = 4; // фон, игрок, пиво, музыка
-let loadedResources = 0;
-
-// Загрузка шейдеров
-const vertexShader = `
-varying vec2 vUv;
-
-void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-const fragmentShader = `
-uniform sampler2D tDiffuse;
-uniform float blurAmount;
-varying vec2 vUv;
-
-void main() {
-    vec4 color = vec4(0.0);
-    float total = 0.0;
-    
-    // Размер шага для размытия
-    vec2 texelSize = vec2(1.0 / 500.0);
-    float radius = 2.0 * blurAmount;
-    
-    // Гауссово размытие
-    for(float x = -radius; x <= radius; x += 1.0) {
-        for(float y = -radius; y <= radius; y += 1.0) {
-            vec2 offset = vec2(x, y) * texelSize;
-            float weight = exp(-(x*x + y*y) / (2.0 * radius * radius));
-            color += texture2D(tDiffuse, vUv + offset) * weight;
-            total += weight;
-        }
-    }
-    
-    gl_FragColor = color / total;
-}`;
-
-loadManager.onProgress = function (url, itemsLoaded, itemsTotal) {
-    loadedResources++;
-    const progress = (loadedResources / totalResources) * 100;
-    progressBar.style.width = progress + '%';
-};
-
-loadManager.onLoad = function () {
-    resourcesLoaded = true;
-    loadingOverlay.style.display = 'none';
-    startOverlay.style.display = 'flex';
-};
 
 // Функция для отслеживания загрузки ресурсов
-function updateLoadingProgress() {
-    loadedResources++;
-    const progress = (loadedResources / totalResources) * 100;
+function updateLoadingProgress(current, total) {
+    const progress = (current / total) * 100;
+    console.log(`Загружено ${current} из ${total}: ${progress}%`);
     progressBar.style.width = progress + '%';
-
-    if (loadedResources >= totalResources) {
-        console.log('Все ресурсы загружены');
-        loadingOverlay.style.display = 'none';
-        startOverlay.style.display = 'flex';
-        init();
-        animate();
-    }
 }
 
 // Предзагрузка текстур с использованием Promise
 function loadTexture(url) {
     return new Promise((resolve, reject) => {
-        textureLoader.load(url,
+        textureLoader.load(
+            url,
             (texture) => {
                 console.log('Текстура загружена:', url);
-                updateLoadingProgress();
                 resolve(texture);
             },
-            undefined,
+            (progress) => {
+                console.log('Загрузка текстуры:', url, progress);
+            },
             (error) => {
                 console.error('Ошибка загрузки текстуры:', url, error);
                 reject(error);
@@ -192,58 +133,87 @@ function loadTexture(url) {
 }
 
 // Предзагрузка аудио с использованием Promise
-function loadAudio(url) {
+function loadAudio(url, options = {}) {
     return new Promise((resolve, reject) => {
-        const audio = new Audio(url);
+        const audio = new Audio();
+
         audio.addEventListener('canplaythrough', () => {
             console.log('Аудио загружено:', url);
-            updateLoadingProgress();
+            if (options.loop) audio.loop = true;
+            if (options.volume) audio.volume = options.volume;
             resolve(audio);
         }, { once: true });
+
         audio.addEventListener('error', (error) => {
             console.error('Ошибка загрузки аудио:', url, error);
             reject(error);
         });
-        audio.load();
+
+        // Для мобильных устройств
+        if (isMobile) {
+            audio.preload = 'auto';
+            audio.load();
+        }
+
+        audio.src = url;
     });
 }
 
 // Асинхронная загрузка всех ресурсов
 async function loadResources() {
-    try {
-        loadedResources = 0;
-        progressBar.style.width = '0%';
+    let loaded = 0;
+    const totalResources = 5; // 3 текстуры + 2 аудио
 
-        const [bgTexture, playerTexture, beerTexture] = await Promise.all([
+    try {
+        loadingText.textContent = 'Загрузка текстур...';
+
+        // Загружаем текстуры
+        [backgroundTexture, playerDefaultTexture, beerTexture] = await Promise.all([
             loadTexture('assets/fon.jpg'),
             loadTexture('assets/vanya.png'),
             loadTexture('assets/пиво1.png')
         ]);
 
-        backgroundTexture = bgTexture;
-        playerDefaultTexture = playerTexture;
-        beerTexture = beerTexture;
+        loaded += 3;
+        updateLoadingProgress(loaded, totalResources);
 
-        // Загрузка аудио
-        backgroundMusic = await loadAudio('assets/background.mp3');
-        backgroundMusic.loop = true;
-        backgroundMusic.volume = 0.3;
+        loadingText.textContent = 'Загрузка аудио...';
 
-        collectSound = await loadAudio('assets/collect.mp3');
-        collectSound.volume = 0.5;
+        // Загружаем аудио
+        backgroundMusic = await loadAudio('assets/background.mp3', { loop: true, volume: 0.3 });
+        loaded++;
+        updateLoadingProgress(loaded, totalResources);
+
+        collectSound = await loadAudio('assets/collect.mp3', { volume: 0.5 });
+        loaded++;
+        updateLoadingProgress(loaded, totalResources);
+
+        console.log('Все ресурсы успешно загружены');
+        loadingText.textContent = 'Загрузка завершена';
+
+        // Инициализируем игру
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+            startOverlay.style.display = 'flex';
+            init();
+            animate();
+        }, 500);
 
     } catch (error) {
         console.error('Ошибка загрузки ресурсов:', error);
-        loadingText.textContent = 'Ошибка загрузки. Обновите страницу.';
+        loadingText.textContent = 'Ошибка загрузки. Нажмите чтобы повторить.';
         loadingText.style.color = 'red';
+
+        // Добавляем возможность повторной загрузки по клику
+        loadingOverlay.onclick = () => {
+            loadingText.textContent = 'Загрузка...';
+            loadingText.style.color = 'white';
+            loadedResources = 0;
+            progressBar.style.width = '0%';
+            loadResources();
+        };
     }
 }
-
-// Изменяем объявление переменных аудио и текстур
-let backgroundTexture, playerDefaultTexture, beerTexture;
-
-// Запускаем загрузку ресурсов
-loadResources();
 
 // Создание счетчика очков
 const scoreElement = document.createElement('div');
