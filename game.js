@@ -158,37 +158,92 @@ loadManager.onLoad = function () {
     startOverlay.style.display = 'flex';
 };
 
-// Предзагрузка текстур
-const backgroundTexture = textureLoader.load('assets/fon.jpg', () => {
-    loadedResources++;
-    updateLoadingProgress();
-});
-const playerDefaultTexture = textureLoader.load('assets/vanya.png', () => {
-    loadedResources++;
-    updateLoadingProgress();
-});
-const beerTexture = textureLoader.load('assets/пиво1.png', () => {
-    loadedResources++;
-    updateLoadingProgress();
-});
-
-// Предзагрузка аудио
-backgroundMusic.addEventListener('canplaythrough', () => {
-    loadedResources++;
-    updateLoadingProgress();
-}, { once: true });
-
+// Функция для отслеживания загрузки ресурсов
 function updateLoadingProgress() {
+    loadedResources++;
     const progress = (loadedResources / totalResources) * 100;
     progressBar.style.width = progress + '%';
-    if (loadedResources === totalResources && !resourcesLoaded) {
-        resourcesLoaded = true;
+
+    if (loadedResources >= totalResources) {
+        console.log('Все ресурсы загружены');
         loadingOverlay.style.display = 'none';
         startOverlay.style.display = 'flex';
         init();
         animate();
     }
 }
+
+// Предзагрузка текстур с использованием Promise
+function loadTexture(url) {
+    return new Promise((resolve, reject) => {
+        textureLoader.load(url,
+            (texture) => {
+                console.log('Текстура загружена:', url);
+                updateLoadingProgress();
+                resolve(texture);
+            },
+            undefined,
+            (error) => {
+                console.error('Ошибка загрузки текстуры:', url, error);
+                reject(error);
+            }
+        );
+    });
+}
+
+// Предзагрузка аудио с использованием Promise
+function loadAudio(url) {
+    return new Promise((resolve, reject) => {
+        const audio = new Audio(url);
+        audio.addEventListener('canplaythrough', () => {
+            console.log('Аудио загружено:', url);
+            updateLoadingProgress();
+            resolve(audio);
+        }, { once: true });
+        audio.addEventListener('error', (error) => {
+            console.error('Ошибка загрузки аудио:', url, error);
+            reject(error);
+        });
+        audio.load();
+    });
+}
+
+// Асинхронная загрузка всех ресурсов
+async function loadResources() {
+    try {
+        loadedResources = 0;
+        progressBar.style.width = '0%';
+
+        const [bgTexture, playerTexture, beerTexture] = await Promise.all([
+            loadTexture('assets/fon.jpg'),
+            loadTexture('assets/vanya.png'),
+            loadTexture('assets/пиво1.png')
+        ]);
+
+        backgroundTexture = bgTexture;
+        playerDefaultTexture = playerTexture;
+        beerTexture = beerTexture;
+
+        // Загрузка аудио
+        backgroundMusic = await loadAudio('assets/background.mp3');
+        backgroundMusic.loop = true;
+        backgroundMusic.volume = 0.3;
+
+        collectSound = await loadAudio('assets/collect.mp3');
+        collectSound.volume = 0.5;
+
+    } catch (error) {
+        console.error('Ошибка загрузки ресурсов:', error);
+        loadingText.textContent = 'Ошибка загрузки. Обновите страницу.';
+        loadingText.style.color = 'red';
+    }
+}
+
+// Изменяем объявление переменных аудио и текстур
+let backgroundTexture, playerDefaultTexture, beerTexture;
+
+// Запускаем загрузку ресурсов
+loadResources();
 
 // Создание счетчика очков
 const scoreElement = document.createElement('div');
