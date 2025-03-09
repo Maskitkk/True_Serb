@@ -7,16 +7,48 @@ let collectibles = [];
 let score = 0;
 let mousePosition = new THREE.Vector3();
 let gameStarted = false;
+let resourcesLoaded = false;
 
-// Аудио
-const backgroundMusic = new Audio('assets/background.mp3');
-backgroundMusic.loop = true;
-backgroundMusic.volume = 0.3;
+// Создание загрузочного экрана
+const loadingOverlay = document.createElement('div');
+loadingOverlay.style.position = 'fixed';
+loadingOverlay.style.top = '0';
+loadingOverlay.style.left = '0';
+loadingOverlay.style.width = '100%';
+loadingOverlay.style.height = '100%';
+loadingOverlay.style.backgroundColor = '#000000';
+loadingOverlay.style.display = 'flex';
+loadingOverlay.style.justifyContent = 'center';
+loadingOverlay.style.alignItems = 'center';
+loadingOverlay.style.zIndex = '2000';
+loadingOverlay.style.flexDirection = 'column';
 
-const collectSound = new Audio('assets/collect.mp3');
-collectSound.volume = 0.5;
+const loadingText = document.createElement('div');
+loadingText.textContent = 'Загрузка...';
+loadingText.style.color = 'white';
+loadingText.style.fontSize = '24px';
+loadingText.style.fontFamily = 'Arial';
+loadingText.style.marginBottom = '20px';
 
-// Создание начального экрана
+const loadingProgress = document.createElement('div');
+loadingProgress.style.width = '200px';
+loadingProgress.style.height = '4px';
+loadingProgress.style.backgroundColor = '#333';
+loadingProgress.style.borderRadius = '2px';
+
+const progressBar = document.createElement('div');
+progressBar.style.width = '0%';
+progressBar.style.height = '100%';
+progressBar.style.backgroundColor = '#4CAF50';
+progressBar.style.borderRadius = '2px';
+progressBar.style.transition = 'width 0.3s';
+
+loadingProgress.appendChild(progressBar);
+loadingOverlay.appendChild(loadingText);
+loadingOverlay.appendChild(loadingProgress);
+document.body.appendChild(loadingOverlay);
+
+// Создание начального экрана (скрыт изначально)
 const startOverlay = document.createElement('div');
 startOverlay.style.position = 'fixed';
 startOverlay.style.top = '0';
@@ -24,7 +56,7 @@ startOverlay.style.left = '0';
 startOverlay.style.width = '100%';
 startOverlay.style.height = '100%';
 startOverlay.style.backgroundColor = '#000000';
-startOverlay.style.display = 'flex';
+startOverlay.style.display = 'none';
 startOverlay.style.justifyContent = 'center';
 startOverlay.style.alignItems = 'center';
 startOverlay.style.zIndex = '1000';
@@ -62,48 +94,63 @@ startOverlay.appendChild(gameTitle);
 startOverlay.appendChild(startText);
 document.body.appendChild(startOverlay);
 
+// Аудио
+const backgroundMusic = new Audio('assets/background.mp3');
+backgroundMusic.loop = true;
+backgroundMusic.volume = 0.3;
+
+const collectSound = new Audio('assets/collect.mp3');
+collectSound.volume = 0.5;
+
 // Загрузчик текстур
 const textureLoader = new THREE.TextureLoader();
+const loadManager = new THREE.LoadingManager();
+let totalResources = 4; // фон, игрок, пиво, музыка
+let loadedResources = 0;
 
-// Загрузка шейдеров
-const vertexShader = `
-varying vec2 vUv;
+loadManager.onProgress = function (url, itemsLoaded, itemsTotal) {
+    loadedResources++;
+    const progress = (loadedResources / totalResources) * 100;
+    progressBar.style.width = progress + '%';
+};
 
-void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-
-const fragmentShader = `
-uniform sampler2D tDiffuse;
-uniform float blurAmount;
-varying vec2 vUv;
-
-void main() {
-    vec4 color = vec4(0.0);
-    float total = 0.0;
-    
-    // Размер шага для размытия
-    vec2 texelSize = vec2(1.0 / 500.0);
-    float radius = 2.0 * blurAmount;
-    
-    // Гауссово размытие
-    for(float x = -radius; x <= radius; x += 1.0) {
-        for(float y = -radius; y <= radius; y += 1.0) {
-            vec2 offset = vec2(x, y) * texelSize;
-            float weight = exp(-(x*x + y*y) / (2.0 * radius * radius));
-            color += texture2D(tDiffuse, vUv + offset) * weight;
-            total += weight;
-        }
-    }
-    
-    gl_FragColor = color / total;
-}`;
+loadManager.onLoad = function () {
+    loadingOverlay.style.display = 'none';
+    startOverlay.style.display = 'flex';
+    init();
+    animate();
+};
 
 // Предзагрузка текстур
-const backgroundTexture = textureLoader.load('assets/fon.jpg');
-const playerDefaultTexture = textureLoader.load('assets/vanya.png');
-const beerTexture = textureLoader.load('assets/пиво1.png');
+const backgroundTexture = textureLoader.load('assets/fon.jpg', () => {
+    loadedResources++;
+    updateLoadingProgress();
+});
+const playerDefaultTexture = textureLoader.load('assets/vanya.png', () => {
+    loadedResources++;
+    updateLoadingProgress();
+});
+const beerTexture = textureLoader.load('assets/пиво1.png', () => {
+    loadedResources++;
+    updateLoadingProgress();
+});
+
+// Предзагрузка аудио
+backgroundMusic.addEventListener('canplaythrough', () => {
+    loadedResources++;
+    updateLoadingProgress();
+}, { once: true });
+
+function updateLoadingProgress() {
+    const progress = (loadedResources / totalResources) * 100;
+    progressBar.style.width = progress + '%';
+    if (loadedResources === totalResources) {
+        loadingOverlay.style.display = 'none';
+        startOverlay.style.display = 'flex';
+        init();
+        animate();
+    }
+}
 
 // Создание счетчика очков
 const scoreElement = document.createElement('div');
