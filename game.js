@@ -6,6 +6,7 @@ let player;
 let collectibles = [];
 let score = 0;
 let mousePosition = new THREE.Vector3();
+let gameStarted = false;
 
 // Аудио
 const backgroundMusic = new Audio('assets/background.mp3');
@@ -15,19 +16,28 @@ backgroundMusic.volume = 0.3;
 const collectSound = new Audio('assets/collect.mp3');
 collectSound.volume = 0.5;
 
-// Добавляем оверлей для запуска музыки
+// Создание начального экрана
 const startOverlay = document.createElement('div');
 startOverlay.style.position = 'fixed';
 startOverlay.style.top = '0';
 startOverlay.style.left = '0';
 startOverlay.style.width = '100%';
 startOverlay.style.height = '100%';
-startOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+startOverlay.style.backgroundColor = '#000000';
 startOverlay.style.display = 'flex';
 startOverlay.style.justifyContent = 'center';
 startOverlay.style.alignItems = 'center';
 startOverlay.style.zIndex = '1000';
 startOverlay.style.cursor = 'pointer';
+startOverlay.style.flexDirection = 'column';
+
+const gameTitle = document.createElement('div');
+gameTitle.textContent = 'True_Serb';
+gameTitle.style.color = 'white';
+gameTitle.style.fontSize = '48px';
+gameTitle.style.fontFamily = 'Arial';
+gameTitle.style.marginBottom = '20px';
+gameTitle.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
 
 const startText = document.createElement('div');
 startText.textContent = 'Нажмите чтобы начать игру';
@@ -35,9 +45,20 @@ startText.style.color = 'white';
 startText.style.fontSize = '24px';
 startText.style.fontFamily = 'Arial';
 startText.style.padding = '20px';
-startText.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+startText.style.backgroundColor = 'rgba(76, 175, 80, 0.3)';
 startText.style.borderRadius = '10px';
+startText.style.cursor = 'pointer';
+startText.style.transition = 'background-color 0.3s';
 
+startText.addEventListener('mouseover', () => {
+    startText.style.backgroundColor = 'rgba(76, 175, 80, 0.5)';
+});
+
+startText.addEventListener('mouseout', () => {
+    startText.style.backgroundColor = 'rgba(76, 175, 80, 0.3)';
+});
+
+startOverlay.appendChild(gameTitle);
 startOverlay.appendChild(startText);
 document.body.appendChild(startOverlay);
 
@@ -95,9 +116,6 @@ scoreElement.style.fontFamily = 'Arial';
 scoreElement.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
 document.body.appendChild(scoreElement);
 updateScore(0);
-
-// Скрываем системный курсор
-document.body.style.cursor = 'none';
 
 // Функция обновления счета
 function updateScore(newScore) {
@@ -226,9 +244,12 @@ function createPlayer() {
 
 // Функция для начала игры
 function startGame() {
-    startOverlay.style.display = 'none';
-    backgroundMusic.play();
-    document.body.style.cursor = 'none';
+    if (!gameStarted) {
+        gameStarted = true;
+        startOverlay.style.display = 'none';
+        backgroundMusic.play();
+        document.body.style.cursor = 'none';
+    }
 }
 
 // Обработчик клика для запуска игры
