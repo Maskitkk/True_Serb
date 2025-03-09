@@ -282,7 +282,7 @@ function createCollectible() {
     }
     collectibles = [];
 
-    const geometry = new THREE.PlaneGeometry(40, 40); // Увеличиваем размер для лучшей видимости
+    const geometry = new THREE.PlaneGeometry(30, 30); // Уменьшаем размер для правильных пропорций
     const material = new THREE.MeshBasicMaterial({
         map: beerTexture,
         transparent: true,
@@ -290,10 +290,14 @@ function createCollectible() {
     });
     const collectible = new THREE.Mesh(geometry, material);
 
-    // Адаптивное размещение в зависимости от устройства
-    const playAreaSize = isMobile ? 600 : 400;
-    collectible.position.x = (Math.random() - 0.5) * playAreaSize;
-    collectible.position.z = (Math.random() - 0.5) * playAreaSize;
+    // Ограничиваем область появления предметов
+    const frustumSize = isMobile ? 400 : 300;
+    const aspect = window.innerWidth / window.innerHeight;
+    const maxX = (frustumSize * aspect) * 0.8; // 80% от видимой области
+    const maxZ = frustumSize * 0.8;
+
+    collectible.position.x = (Math.random() - 0.5) * maxX * 2;
+    collectible.position.z = (Math.random() - 0.5) * maxZ * 2;
     collectible.position.y = 2;
     collectible.rotation.x = -Math.PI / 2;
 
@@ -356,8 +360,14 @@ function getMouseWorldPosition(event) {
 function createBackground() {
     const backgroundGroup = new THREE.Group();
 
+    // Вычисляем размер фона с учетом соотношения сторон экрана
+    const frustumSize = isMobile ? 400 : 300;
+    const aspect = window.innerWidth / window.innerHeight;
+    const width = frustumSize * aspect * 3; // Увеличиваем размер фона
+    const height = frustumSize * 3;
+
     // Основное фоновое изображение
-    const geometry = new THREE.PlaneGeometry(800, 800); // Увеличиваем размер фона
+    const geometry = new THREE.PlaneGeometry(width, height);
     const material = new THREE.ShaderMaterial({
         uniforms: {
             tDiffuse: { value: backgroundTexture },
@@ -372,8 +382,8 @@ function createBackground() {
     background.rotation.x = -Math.PI / 2;
     background.position.y = 0;
 
-    // Затемняющий слой
-    const darkOverlayGeometry = new THREE.PlaneGeometry(800, 800);
+    // Затемняющий слой с теми же размерами
+    const darkOverlayGeometry = new THREE.PlaneGeometry(width, height);
     const darkOverlayMaterial = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
@@ -391,7 +401,7 @@ function createBackground() {
 
 // Создание игрока
 function createPlayer() {
-    const geometry = new THREE.PlaneGeometry(50, 50); // Увеличиваем размер игрока
+    const geometry = new THREE.PlaneGeometry(35, 35); // Корректируем размер игрока
     const material = new THREE.MeshBasicMaterial({
         map: playerDefaultTexture,
         transparent: true,
